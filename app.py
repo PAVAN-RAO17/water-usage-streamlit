@@ -1,3 +1,4 @@
+import os
 import streamlit as st
 import pandas as pd
 from model import predict_expected_usage
@@ -13,10 +14,27 @@ st.set_page_config(
 st.title("💧 Smart Water Usage AI System")
 st.subheader("Save Water • Earn Rewards • Build a Sustainable Future")
 
-DATA_PATH = "data/water_data.csv"
+DATA_DIR = "data"
+DATA_PATH = os.path.join(DATA_DIR, "water_data.csv")
 
-df = pd.read_csv(DATA_PATH)
-df['date'] = pd.to_datetime(df['date'])
+# Ensure data directory exists
+if not os.path.exists(DATA_DIR):
+    os.makedirs(DATA_DIR)
+
+# If CSV does not exist, create it
+if not os.path.exists(DATA_PATH):
+    df = pd.DataFrame({
+        "date": ["2024-01-01"],
+        "usage_liters": [420],
+        "family_members": [4],
+        "expected_usage": [450],
+        "reward_points": [0]
+    })
+    df.to_csv(DATA_PATH, index=False)
+else:
+    df = pd.read_csv(DATA_PATH)
+
+df["date"] = pd.to_datetime(df["date"])
 
 with st.sidebar:
     st.header("📥 Enter Today's Usage")
