@@ -1,17 +1,19 @@
 import pandas as pd
-from prophet import Prophet
 
-def predict_expected_usage(df):
-    prophet_df = df[['date', 'usage_liters']].rename(
-        columns={'date': 'ds', 'usage_liters': 'y'}
+def predict_expected_usage(df, window=7):
+    """
+    Predict expected water usage using rolling average.
+    Falls back to overall mean if data is small.
+    """
+
+    if len(df) < window:
+        return round(df["usage_liters"].mean(), 2)
+
+    rolling_avg = (
+        df["usage_liters"]
+        .rolling(window=window)
+        .mean()
+        .iloc[-1]
     )
 
-    model = Prophet()
-    model.fit(prophet_df)
-
-
-    future = model.make_future_dataframe(periods=1)
-    forecast = model.predict(future)
-
-    expected = forecast.iloc[-1]['yhat']
-    return round(expected,2)
+    return round(rolling_avg, 2)
