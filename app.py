@@ -14,60 +14,12 @@ from logic import calculate_rewards
 st.set_page_config(
     page_title="Smart Water AI",
     page_icon="💧",
-    layout="wide",
-    initial_sidebar_state="expanded",
+    layout="wide"
 )
 
 
 # ==================================================
-# FUTURISTIC CSS (GLOW + ANIMATIONS)
-# ==================================================
-st.markdown(
-    """
-    <style>
-    body {
-        background-color: #0b0f19;
-        color: #e0e0e0;
-    }
-
-    .glow-card {
-        background: linear-gradient(135deg, #0f2027, #203a43, #2c5364);
-        border-radius: 16px;
-        padding: 20px;
-        box-shadow: 0 0 20px rgba(0, 255, 255, 0.25);
-        animation: glow 2.5s infinite alternate;
-    }
-
-    @keyframes glow {
-        from { box-shadow: 0 0 10px rgba(0,255,255,0.2); }
-        to   { box-shadow: 0 0 25px rgba(0,255,255,0.6); }
-    }
-
-    .slide-in {
-        animation: slide 0.8s ease-out;
-    }
-
-    @keyframes slide {
-        from { transform: translateY(20px); opacity: 0; }
-        to   { transform: translateY(0); opacity: 1; }
-    }
-
-    .tip-box {
-        background-color: #111827;
-        border-left: 4px solid #22d3ee;
-        padding: 15px;
-        border-radius: 12px;
-        margin-top: 10px;
-        animation: slide 0.8s ease-out;
-    }
-    </style>
-    """,
-    unsafe_allow_html=True,
-)
-
-
-# ==================================================
-# SAFE CSV LOADING
+# DATA SETUP (SAFE & BACKWARD-COMPATIBLE)
 # ==================================================
 DATA_DIR = "data"
 DATA_PATH = os.path.join(DATA_DIR, "water_data.csv")
@@ -76,171 +28,167 @@ if not os.path.exists(DATA_DIR):
     os.makedirs(DATA_DIR)
 
 if not os.path.exists(DATA_PATH):
-    df = pd.DataFrame(
-        {
-            "date": ["2024-01-01"],
-            "usage_liters": [420],
-            "family_members": [4],
-            "expected_usage": [450],
-            "reward_points": [0],
-        }
-    )
+    df = pd.DataFrame({
+        "date": [],
+        "usage_liters": [],
+        "family_members": [],
+        "expected_usage": [],
+        "reward_points": [],
+        "efficiency_score": [],
+        "streak": []
+    })
     df.to_csv(DATA_PATH, index=False)
-else:
-    df = pd.read_csv(DATA_PATH)
 
-df["date"] = pd.to_datetime(df["date"])
+df = pd.read_csv(DATA_PATH)
+
+# Ensure required columns exist (FIXES YOUR ERROR)
+required_cols = [
+    "date",
+    "usage_liters",
+    "family_members",
+    "expected_usage",
+    "reward_points",
+    "efficiency_score",
+    "streak"
+]
+
+for col in required_cols:
+    if col not in df.columns:
+        df[col] = 0
+
+if not df.empty:
+    df["date"] = pd.to_datetime(df["date"], errors="coerce")
 
 
 # ==================================================
 # HEADER
 # ==================================================
-st.markdown(
-    "<h1 class='slide-in'>💧 Smart Water Usage AI</h1>",
-    unsafe_allow_html=True,
-)
-st.caption("AI-powered insights for sustainable water usage 🌐")
+st.title("💧 Smart Water Usage AI")
+st.caption("Simple, reliable & sustainable water monitoring system")
 st.divider()
 
 
 # ==================================================
-# SIDEBAR
+# SIDEBAR INPUT
 # ==================================================
 with st.sidebar:
     st.header("📥 Daily Input")
-    usage = st.number_input("Water Used Today (liters)", min_value=0)
-    members = st.number_input("Family Members", min_value=1)
-    analyze = st.button("Analyze with AI ⚡")
+    usage = st.number_input("Water used today (liters)", min_value=0)
+    members = st.number_input("Family members", min_value=1)
+    analyze = st.button("Analyze Usage")
 
 
 # ==================================================
 # MAIN LOGIC
 # ==================================================
 if analyze:
-    with st.spinner("Running AI analysis..."):
-        expected = predict_expected_usage(df)
-        reward = calculate_rewards(usage, expected)
+    expected = predict_expected_usage(df)
+    reward = calculate_rewards(usage, expected)
 
+    # -----------------------------
+    # WATER EFFICIENCY SCORE
+    # -----------------------------
+    if expected > 0:
+        efficiency = max(0, min(100, int((1 - usage / expected) * 100)))
+    else:
+        efficiency = 0
+
+    # -----------------------------
+    # CONSERVATION STREAK (SAFE)
+    # -----------------------------
+    if not df.empty and "streak" in df.columns:
+        last_streak = int(df.iloc[-1]["streak"])
+    else:
+        last_streak = 0
+
+    streak = last_streak + 1 if usage < expected else 0
+
+    # -----------------------------
+    # ENVIRONMENTAL IMPACT
+    # -----------------------------
+    saved = max(0, expected - usage)
+    people_helped = saved // 100
+
+    # -----------------------------
+    # ACHIEVEMENT BADGE
+    # -----------------------------
+    if streak >= 7:
+        badge = "🥇 Water Hero"
+    elif streak >= 3:
+        badge = "🥈 Eco Guardian"
+    elif streak >= 1:
+        badge = "🥉 Smart Saver"
+    else:
+        badge = "No badge yet"
+
+    # -----------------------------
+    # SAVE DATA
+    # -----------------------------
     new_row = {
         "date": datetime.today(),
         "usage_liters": usage,
         "family_members": members,
         "expected_usage": expected,
         "reward_points": reward,
+        "efficiency_score": efficiency,
+        "streak": streak
     }
 
     df = pd.concat([df, pd.DataFrame([new_row])], ignore_index=True)
     df.to_csv(DATA_PATH, index=False)
 
-    st.toast("AI analysis complete ✔", icon="🤖")
+    st.success("Analysis completed successfully ✔")
 
-    # ------------------------------
-    # METRICS (FUTURISTIC)
-    # ------------------------------
+
+    # ==================================================
+    # RESULTS DISPLAY
+    # ==================================================
     col1, col2, col3 = st.columns(3)
 
-    with col1:
-        st.markdown(
-            f"""
-            <div class="glow-card">
-            <h3>💦 Usage</h3>
-            <h2>{usage} L</h2>
-            </div>
-            """,
-            unsafe_allow_html=True,
-        )
+    col1.metric("Today's Usage (L)", usage)
+    col2.metric("Expected Usage (L)", expected)
+    col3.metric("Efficiency Score", f"{efficiency}%")
 
-    with col2:
-        st.markdown(
-            f"""
-            <div class="glow-card">
-            <h3>📊 Expected</h3>
-            <h2>{expected} L</h2>
-            </div>
-            """,
-            unsafe_allow_html=True,
-        )
+    st.subheader("🏆 Achievement")
+    st.info(badge)
 
-    with col3:
-        st.markdown(
-            f"""
-            <div class="glow-card">
-            <h3>⭐ Rewards</h3>
-            <h2>{reward}</h2>
-            </div>
-            """,
-            unsafe_allow_html=True,
-        )
+    st.subheader("🌍 Environmental Impact")
+    st.write(f"💧 Water saved: **{saved} liters**")
+    st.write(f"👤 Drinking water for **{people_helped} people/day**")
 
-    # ------------------------------
-    # PROGRESS + FEEDBACK
-    # ------------------------------
-    st.subheader("🚰 Water Efficiency Index")
-
-    if usage < expected:
-        progress = min((expected - usage) / expected, 1.0)
-        st.progress(progress)
-        st.success("Efficiency level optimal 🌱")
-    else:
-        st.progress(0.15)
-        st.warning("Efficiency below optimal – consider reducing usage ⚠️")
-
-    st.subheader("🧠 AI Feedback")
-
-    if reward > 0:
-        st.info("Status: **Water Saver Mode Activated** ✅")
-    else:
-        st.info("Status: **Optimization Recommended** ⚙️")
+    st.subheader("🔥 Conservation Streak")
+    st.write(f"Current streak: **{streak} days**")
 
 
 # ==================================================
-# ANALYTICS
+# ANALYTICS 
 # ==================================================
-st.divider()
-st.subheader("📈 Consumption Intelligence")
+if not df.empty:
+    st.divider()
+    st.subheader("📈 Usage Analytics")
 
-col1, col2 = st.columns([2, 1])
-
-with col1:
     st.line_chart(
         df.set_index("date")[["usage_liters", "expected_usage"]],
-        height=350,
-    )
-
-with col2:
-    st.markdown(
-        """
-        **Graph Legend**
-        - 🔵 Actual consumption  
-        - ⚫ AI baseline  
-        - Staying below baseline improves efficiency  
-        """
+        height=300
     )
 
 
 # ==================================================
-# SMART TIPS
+# WATER SAVING TIPS
 # ==================================================
-st.divider()
-st.subheader("💡 Smart Water Optimization Tips")
-
 tips = [
-    "Turn off taps during brushing 🪥",
-    "Repair leaks immediately 🚰",
-    "Prefer bucket baths over long showers 🪣",
-    "Reuse RO wastewater for plants 🌿",
-    "Run appliances only at full load 👕",
-    "Harvest rainwater where possible 🌧️",
+    "Turn off tap while brushing 🪥",
+    "Fix leaking taps 🚰",
+    "Use bucket instead of shower 🪣",
+    "Reuse RO wastewater 🌱",
+    "Harvest rainwater 🌧️"
 ]
 
-st.markdown(
-    f"<div class='tip-box'>🤖 AI Suggests: {np.random.choice(tips)}</div>",
-    unsafe_allow_html=True,
-)
+st.divider()
+st.info(f"💡 Tip: {np.random.choice(tips)}")
 
 
 # ==================================================
 # FOOTER
 # ==================================================
-st.markdown("---")
-st.caption("🚀 Futuristic AI Dashboard | Innovation & Design Thinking Project")
+st.caption("Smart Water AI | Clean • Stable •" )
